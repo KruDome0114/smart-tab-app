@@ -33,7 +33,7 @@
             </button>
         </div>
 
-        <!-- จอ Monitor ขณะบันทึกเสียง -->
+        <!-- [ปรับแก้] จอ Monitor ขณะบันทึกเสียง เปลี่ยนเป็นแสดงตัวโน้ตและสาย -->
         <div id="live-tab-container" class="hidden w-full bg-blue-50 rounded-2xl shadow-md border-2 border-blue-200 p-4 transition-all duration-500 opacity-0 translate-y-4">
             <div class="flex items-center justify-between mb-3 border-b border-blue-200 pb-2">
                 <div class="flex items-center gap-2">
@@ -43,8 +43,9 @@
                 <span class="text-xs text-blue-400 font-bold" id="process-status-text">กำลังอัดเสียง...</span>
             </div>
             
-            <div class="h-24 flex items-end justify-center gap-1 overflow-hidden" id="visualizer">
-                <!-- แท่งเสียงจะถูกสร้างด้วย JS -->
+            <div class="flex flex-col items-center justify-center py-4" id="visualizer">
+                <div class="text-4xl font-bold text-[#004aad] mb-2" id="live-note">-</div>
+                <div class="text-sm font-bold text-gray-500" id="live-string">กำลังรอเสียง...</div>
             </div>
         </div>
 
@@ -54,7 +55,7 @@
         </form>
     </main>
 
-    <!-- Nav Bar (เหมือนเดิม) -->
+    <!-- Nav Bar -->
     <nav class="bg-[#004aad] text-white fixed bottom-0 w-full z-50 h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
         <div class="max-w-md mx-auto h-full flex justify-around items-center px-2">
             <a href="/home/{{ username }}" class="flex flex-col items-center justify-center p-2 text-blue-200 hover:text-white"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg></a>
@@ -64,28 +65,86 @@
         </div>
     </nav>
 
-    <!-- ระบบอัดเสียงฝั่งเบราว์เซอร์ (Client-side) -->
     <script>
         let isRecording = false;
         let audioContext;
         let processor;
+        let analyser;
         let mediaStream;
         let audioData = [];
-        let visualizerInterval;
+        let buf = new Float32Array(2048);
+        const noteStrings = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-        // ฟังก์ชันสร้างคลื่นเสียงหลอกให้ UI ดูมีชีวิตชีวา
-        function drawVisualizer() {
-            const container = document.getElementById('visualizer');
-            container.innerHTML = '';
-            for (let i = 0; i < 30; i++) {
-                const bar = document.createElement('div');
-                bar.className = 'w-1.5 bg-[#004aad] rounded-t-sm';
-                bar.style.height = Math.random() * 100 + '%';
-                container.appendChild(bar);
+        // อัลกอริทึมจับคลื่นเสียง (Auto-correlation)
+        function autoCorrelate(buf, sampleRate) {
+            let SIZE = buf.length;
+            let rms = 0;
+            for (let i = 0; i < SIZE; i++) rms += buf[i] * buf[i];
+            rms = Math.sqrt(rms / SIZE);
+            if (rms < 0.01) return -1; // เสียงเบาไป
+
+            let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+            for (let i = 0; i < SIZE / 2; i++) if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+            for (let i = 1; i < SIZE / 2; i++) if (Math.abs(buf[SIZE - i]) < thres) { r2 = SIZE - i; break; }
+
+            buf = buf.slice(r1, r2);
+            SIZE = buf.length;
+            let c = new Array(SIZE).fill(0);
+            for (let i = 0; i < SIZE; i++) {
+                for (let j = 0; j < SIZE - i; j++) {
+                    c[i] = c[i] + buf[j] * buf[j + i];
+                }
             }
+
+            let d = 0; while (c[d] > c[d + 1]) d++;
+            let maxval = -1, maxpos = -1;
+            for (let i = d; i < SIZE; i++) {
+                if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+            }
+            let T0 = maxpos;
+            let x1 = c[T0 - 1], x2 = c[T0], x3 = c[T0 + 1];
+            let a = (x1 + x3 - 2 * x2) / 2;
+            let b = (x3 - x1) / 2;
+            if (a) T0 = T0 - b / (2 * a);
+
+            return sampleRate / T0;
         }
 
-        // ตัวเข้ารหัสแปลงเสียงดิบเป็นไฟล์ .wav มาตรฐาน
+        function guessString(pitch) {
+            if (pitch >= 300) return "สายที่ 1 (e)";
+            if (pitch >= 220) return "สายที่ 2 (B)";
+            if (pitch >= 170) return "สายที่ 3 (G)";
+            if (pitch >= 130) return "สายที่ 4 (D)";
+            if (pitch >= 90) return "สายที่ 5 (A)";
+            return "สายที่ 6 (E)";
+        }
+
+        // ฟังก์ชันอัปเดตหน้าจอแบบเรียลไทม์
+        function updateLiveMonitor() {
+            if (!isRecording) return;
+
+            analyser.getFloatTimeDomainData(buf);
+            let pitch = autoCorrelate(buf, audioContext.sampleRate);
+            
+            const noteEl = document.getElementById('live-note');
+            const stringEl = document.getElementById('live-string');
+
+            if (pitch == -1) {
+                noteEl.innerText = "-";
+                noteEl.classList.remove('text-green-500');
+                noteEl.classList.add('text-[#004aad]');
+                stringEl.innerText = "กำลังรอเสียง...";
+            } else {
+                let note = Math.round(12 * (Math.log(pitch / 440) / Math.log(2))) + 69;
+                noteEl.innerText = noteStrings[note % 12];
+                noteEl.classList.remove('text-[#004aad]');
+                noteEl.classList.add('text-green-500');
+                stringEl.innerText = guessString(pitch) + " ~ " + Math.round(pitch) + " Hz";
+            }
+            
+            window.requestAnimationFrame(updateLiveMonitor);
+        }
+
         function exportWAV(audioData, sampleRate) {
             const buffer = new ArrayBuffer(44 + audioData.length * 2);
             const view = new DataView(buffer);
@@ -117,7 +176,7 @@
                     mediaStream = stream;
                     const source = audioContext.createMediaStreamSource(stream);
                     
-                    // จับเสียงทีละท่อน
+                    // สำหรับอัดเสียง
                     processor = audioContext.createScriptProcessor(4096, 1, 1);
                     source.connect(processor);
                     processor.connect(audioContext.destination);
@@ -126,6 +185,11 @@
                     processor.onaudioprocess = (e) => {
                         audioData.push(new Float32Array(e.inputBuffer.getChannelData(0)));
                     };
+
+                    // สำหรับวิเคราะห์แบบเรียลไทม์
+                    analyser = audioContext.createAnalyser();
+                    analyser.fftSize = 2048;
+                    source.connect(analyser);
 
                     isRecording = true;
                     btn.classList.replace('bg-white', 'bg-red-500');
@@ -137,7 +201,9 @@
                     status.classList.add('text-red-500', 'font-bold');
 
                     liveContainer.classList.remove('hidden', 'opacity-0', 'translate-y-4');
-                    visualizerInterval = setInterval(drawVisualizer, 150);
+                    
+                    // เริ่มแสดงตัวโน้ตแบบเรียลไทม์
+                    updateLiveMonitor();
 
                 } catch (err) {
                     alert("กรุณาอนุญาตการใช้ไมโครโฟน และใช้งานผ่าน https://");
@@ -146,21 +212,18 @@
                 isRecording = false;
                 processor.disconnect();
                 mediaStream.getTracks().forEach(track => track.stop());
-                clearInterval(visualizerInterval);
 
                 text.innerText = "วิเคราะห์ AI...";
                 btn.classList.remove('animate-pulse');
                 document.getElementById('process-status-text').innerText = "ส่งข้อมูลให้ AI วิเคราะห์ (อาจใช้เวลาสักครู่)...";
-                document.getElementById('visualizer').innerHTML = '<div class="text-blue-500 font-bold mt-6 animate-pulse">กำลังประมวลผลแท็บ...</div>';
+                document.getElementById('visualizer').innerHTML = '<div class="text-[#004aad] font-bold mt-2 animate-pulse">กำลังแปลงไฟล์เป็นแท็บ...</div>';
 
-                // รวมไฟล์เสียงที่อัดไว้ทั้งหมด
                 let length = 0;
                 audioData.forEach(item => length += item.length);
                 let result = new Float32Array(length);
                 let offset = 0;
                 audioData.forEach(item => { result.set(item, offset); offset += item.length; });
 
-                // แปลงเป็น .wav และอัปโหลด
                 const wavBlob = exportWAV(result, audioContext.sampleRate);
                 const formData = new FormData();
                 formData.append('audio', wavBlob, 'recording.wav');
