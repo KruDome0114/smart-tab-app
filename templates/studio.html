@@ -28,7 +28,9 @@
         <div class="bg-white p-6 rounded-3xl shadow-lg border border-gray-200 flex flex-col items-center justify-center w-full max-w-sm mb-6" id="main-control-box">
             <p id="record-status" class="text-gray-600 mb-6 text-center text-sm font-medium">เสียบกีตาร์ของคุณ แล้วกดปุ่มเพื่อเริ่มอัดเสียง</p>
             <button id="record-btn" onclick="toggleRecording()" class="relative w-32 h-32 bg-white hover:bg-blue-50 rounded-full flex flex-col items-center justify-center shadow-lg transition transform active:scale-95 border-4 border-[#004aad] text-[#004aad]">
-                <svg id="record-icon" class="w-12 h-12 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+                <svg id="record-icon" class="w-12 h-12 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path>
+                </svg>
                 <span id="record-text" class="font-bold text-base">เริ่มอัด</span>
             </button>
         </div>
@@ -73,8 +75,6 @@ E|----------------------------------------------------|
         let isRecording = false;
         let audioContext, processor, analyser, mediaStream, filter;
         let audioData = [];
-        
-        // ขยาย Buffer ให้ใหญ่ขึ้น เพื่อจับเสียงต่ำๆ อย่างสาย 6 ได้แม่นขึ้น
         let buf = new Float32Array(4096); 
 
         const guitarMap = [
@@ -89,7 +89,7 @@ E|----------------------------------------------------|
         let currentTabLines = { 1: "e|-", 2: "B|-", 3: "G|-", 4: "D|-", 5: "A|-", 6: "E|-" };
         let lastString = null, lastFret = null;
         let lastNoteTime = 0;
-        let prevRms = 0; // ตัวแปรเก็บความดังจังหวะก่อนหน้า เพื่อดักจับ "การกระแทกปิ๊ก"
+        let prevRms = 0; 
 
         function resetTab() {
             currentTabLines = { 1: "e|-", 2: "B|-", 3: "G|-", 4: "D|-", 5: "A|-", 6: "E|-" };
@@ -162,10 +162,8 @@ E|----------------------------------------------------|
 
             let now = Date.now();
             
-            // กฎใหม่ (Onset Detection): เสียงต้องดังขึ้นอย่างฉับพลัน (กระแทกสาย) และทิ้งช่วงห่างจากการดีดครั้งก่อน 250ms
             if (rms > 0.02 && (rms - prevRms > 0.01) && (now - lastNoteTime > 250)) {
                 
-                // ถ่วงเวลา 20 มิลลิวินาที ให้คลื่นเสียงนิ่งหลังกระแทกปิ๊ก แล้วค่อยอ่านค่าความถี่
                 setTimeout(() => {
                     analyser.getFloatTimeDomainData(buf);
                     let pitch = autoCorrelate(buf, audioContext.sampleRate);
@@ -174,24 +172,28 @@ E|----------------------------------------------------|
                         let candidates = guitarMap.filter(m => pitch >= m[0] && pitch <= m[1]).map(m => ({str: m[2], fret: m[3]}));
                         if (candidates.length > 0) {
                             let best = candidates[0];
-                            // ถ้างงว่าสายไหน ให้พยายามเลือกสายที่ใกล้กับการดีดครั้งล่าสุด
-                            if (candidates.length > 1 && lastString !== null) {
-                                let minD = 9999;
-                                for (let c of candidates) {
-                                    let d = Math.abs(c.fret - lastFret) + (Math.abs(c.str - lastString) * 3);
-                                    if (d < minD) { minD = d; best = c; }
-                                }
+                            
+                            let minD = 9999;
+                            for (let c of candidates) {
+                                // [จุดปรับปรุงใหม่] ให้โบนัสคะแนนพิเศษกับเฟรตที่อยู่ช่วงต้นคอ (Fret 0-5) 
+                                // เพื่อบังคับให้เลือก สาย 2 ช่อง 3 แทน สาย 1 ช่อง 10
+                                let positionPenalty = (c.fret > 6) ? (c.fret * 1.5) : 0;
+                                let stringPenalty = (lastString !== null && c.str === lastString) ? 0 : 3;
+                                
+                                let d = Math.abs(c.fret - (lastFret || 2)) + stringPenalty + positionPenalty;
+                                if (d < minD) { minD = d; best = c; }
                             }
+
                             lastString = best.str; lastFret = best.fret;
                             addNoteToTab(best.str, best.fret);
                         }
                     }
-                }, 20);
+                }, 80); 
                 
                 lastNoteTime = now;
             }
             
-            prevRms = rms; // เก็บค่าความดังรอบนี้ ไว้เทียบกับรอบหน้า
+            prevRms = rms; 
             window.requestAnimationFrame(updateLiveMonitor);
         }
 
@@ -202,7 +204,7 @@ E|----------------------------------------------------|
             writeString(0, 'RIFF'); view.setUint32(4, 36 + audioData.length * 2, true);
             writeString(8, 'WAVE'); writeString(12, 'fmt '); view.setUint32(16, 16, true);
             view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, sampleRate, true);
-            view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true);
+            view.setUint32(28, sampleRate * 2, true); view.setUint16(32, 2, true); view.setUint32(34, 16, true);
             writeString(36, 'data'); view.setUint32(40, audioData.length * 2, true);
             let offset = 44;
             for (let i = 0; i < audioData.length; i++, offset += 2) {
@@ -226,22 +228,18 @@ E|----------------------------------------------------|
                     mediaStream = stream;
                     const source = audioContext.createMediaStreamSource(stream);
                     
-                    // อัดเสียงส่งเซิร์ฟเวอร์
                     processor = audioContext.createScriptProcessor(4096, 1, 1);
                     source.connect(processor); processor.connect(audioContext.destination);
                     audioData = [];
                     processor.onaudioprocess = (e) => { audioData.push(new Float32Array(e.inputBuffer.getChannelData(0))); };
 
-                    // 1. เปิดฟิลเตอร์กรองเสียง Low-Pass ตัดเสียงแหลมสะท้อนทิ้ง เพื่อให้ได้โน้ตเพียวๆ
                     filter = audioContext.createBiquadFilter();
                     filter.type = 'lowpass';
                     filter.frequency.value = 1000; 
                     
-                    // 2. ขยายขนาดการประมวลผลให้จับสาย 6 แม่นขึ้น
                     analyser = audioContext.createAnalyser();
                     analyser.fftSize = 4096; 
                     
-                    // เชื่อมต่อ: ไมค์ -> ฟิลเตอร์ตัดเสียง -> ตัววิเคราะห์ AI
                     source.connect(filter);
                     filter.connect(analyser);
 
