@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>คู่มือการใช้งาน - Smart Tab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Prompt', sans-serif; 
+            background-color: #f8fafc; /* พื้นหลังคลีนๆ */
+        }
+    </style>
+</head>
+<body class="pb-24 pt-16 flex flex-col min-h-screen text-gray-800">
+
+    <header class="bg-[#004aad] fixed top-0 w-full z-50 shadow-md h-16 flex items-center justify-center px-4 text-white">
+        <h1 class="text-xl font-bold tracking-wide">📖 คู่มือการใช้งาน</h1>
+    </header>
+
+    <main class="flex-grow max-w-lg mx-auto w-full px-4 mt-6 space-y-6">
+        
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="font-bold text-[#004aad] text-lg mb-3 flex items-center gap-2">
+                <span class="bg-blue-100 text-[#004aad] w-6 h-6 rounded-full flex items-center justify-center text-sm">1</span>
+                เตรียมกีตาร์ของคุณ
+            </h2>
+            <p class="text-gray-600 text-sm">เสียบกีตาร์ไฟฟ้าเข้ากับออดิโออินเตอร์เฟส หรือใช้ไมโครโฟนจ่อกีตาร์โปร่งของคุณ แนะนำให้ตั้งสายกีตาร์ให้ตรงก่อนเริ่มใช้งาน</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="font-bold text-[#004aad] text-lg mb-3 flex items-center gap-2">
+                <span class="bg-blue-100 text-[#004aad] w-6 h-6 rounded-full flex items-center justify-center text-sm">2</span>
+                เข้าห้องอัด (Studio)
+            </h2>
+            <p class="text-gray-600 text-sm">กดปุ่มสีขาวตรงกลางเมนูด้านล่าง จากนั้นกดปุ่ม "เริ่มอัด" แล้วดีดกีตาร์ตามจังหวะของคุณได้เลย</p>
+        </div>
+
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+            <h2 class="font-bold text-[#004aad] text-lg mb-3 flex items-center gap-2">
+                <span class="bg-blue-100 text-[#004aad] w-6 h-6 rounded-full flex items-center justify-center text-sm">3</span>
+                แก้ไขและบันทึก
+            </h2>
+            <p class="text-gray-600 text-sm">เมื่อกดหยุดอัด ระบบจะพามาหน้าตัวแก้ไขแท็บ (Editor) คุณสามารถลบตัวเลขที่ผิดพลาด หรือพิมพ์สัญลักษณ์เทคนิคพิเศษต่างๆ (เช่น h, p, /, b) เพิ่มเติมได้ตามต้องการ</p>
+        </div>
+
+    </main>
+
+    <nav class="bg-[#004aad] text-white fixed bottom-0 w-full z-50 h-16 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+        <div class="max-w-md mx-auto h-full flex justify-around items-center px-2">
+            <a href="/home/{{ username }}" class="flex flex-col items-center justify-center p-2 text-blue-200 hover:text-white transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            </a>
+            <a href="/profile/{{ username }}" class="flex flex-col items-center justify-center p-2 text-blue-200 hover:text-white transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            </a>
+            <a href="/studio/{{ username }}" class="flex flex-col items-center justify-center p-2 text-blue-200 hover:text-white transition">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+            </a>
+            <button class="flex flex-col items-center justify-center w-14 h-14 bg-white rounded-full shadow-md transform -translate-y-4 border-4 border-blue-200 transition">
+                <svg class="w-8 h-8 text-[#004aad]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+            </button>
+        </div>
+    </nav>
+</body>
+</html>
